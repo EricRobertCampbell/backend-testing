@@ -1,0 +1,7 @@
+# vim swap files
+.swp
+.swo
+
+# python nonsense
+__pycache__
+__init__.py
