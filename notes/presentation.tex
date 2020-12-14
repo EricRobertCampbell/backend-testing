@@ -10,8 +10,12 @@
 \usepackage{lstautogobble}
 \usepackage{listings}
 \lstset{numbers=left, frame=l, tabsize=3, basicstyle=\footnotesize, breaklines=true, frame=single}
+\lstdefinestyle{python}{language=python}
+\lstdefinestyle{output}{numbers=left, frame=l, tabsize=3, basicstyle=\footnotesize, breaklines=true, frame=single}
 
-\title{Frontend Testing with Jest and Cypress}
+\newcommand{\code}[1]{\texttt{#1}}
+
+\title{Backend Testing with \code{unittest}, \code{Django}, and \code{Graphene}}
 \author{Eric Campbell}
 \date{}
 
@@ -20,201 +24,295 @@
 		\maketitle
 	\end{frame}
 
-	\section{Testing Fundamentals}
-	\begin{frame}{Testing Fundamentals}
+	\section{Unit Testing with \code{unittest}}
+
+	\begin{frame}[fragile]{\code{unittest} Module --- Setup}
 		\begin{itemize}
-			\item ``3'' Types
+			\item Python comes with a built-in module for testing: \code{unittest}
+			\item Several other alternatives, but this one is built in and does what we need
+			\item Create a \emph{test suite} by subclassing \code{unittest.TestCase} with a name starting with `Test'
+			\item Create a single test as a method of the test class with a name starting with `test\_' --- your test won't be picked up without this
+		\end{itemize}
+		\begin{lstlisting}[style=python, autogobble]
+			import unittest
+
+			class TestSomeStuff(unittest.TestCase):
+				test_a_thing(self):
+					assertions go here!
+				test_another_thing(self):
+					some more assertions!
+		\end{lstlisting}
+	\end{frame}
+
+	\begin{frame}[fragile]{Assertions}
+		\begin{itemize}
+			\item General format in test: 
+
+				\code{self.assertSomething(params, "Message if the assertion fails")}
+
+			\item Some useful ones:
+				\begin{itemize}
+					\item \code{self.assertEqual(a, b, "message")} --- whether the two are equal (\code{==})
+					\item \code{self.assertTrue(complex condition, "message")} --- whether some complex condition is true
+					\item \code{self.assertIn(elem, structure, "message")} --- \code{elem in structure} --- Very useful for testing GraphQL responses
+					\item \code{self.assertRaises(Exception, "message")} --- it raises an exception of the given type (use with context provider) 
+				\end{itemize}
+			\item Also the usual suite of asserting greater than, not equal, is an instance of, \&c.
+			\item (Full list at the \href{https://docs.python.org/3/library/unittest.html#unittest.TestCase.assertEqual}{official docs})
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile]{Running}
+		\begin{itemize}
+			\item To run it:
+
+				\code{python -m unittest test\_some\_stuff.py}
+			\item By default, the output is
+				\begin{itemize}
+					\item Full stop: successful test
+					\item E: failed test
+				\end{itemize}
+			\item Can set the verbosity with \code{--verbose} flag
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile, allowframebreaks]{Example --- Testing an Addition Function}
+		Let's test the behaviour of our addition function:
+		\lstinputlisting[style=python, title=add.py]{./code/simple/v1-add.py}
+		
+		It should:
+		\begin{enumerate}
+			\item Return numbers
+			\item Work correctly for \code{int}s
+			\item Work correctly for \code{float}s
+			\item Fail on anything else
+		\end{enumerate}
+
+		\framebreak
+
+		\lstinputlisting[style=python, title=test\_some\_functions.py]{./code/simple/v1-test_some_functions.py}
+
+		\framebreak
+	
+		\lstinputlisting[style=output, title=Output]{./code/simple/v1-output.txt}
+	\end{frame}
+
+	\begin{frame}{Discussion}
+		Two things went wrong. One issue was with our function, and one was with the test.
+		\begin{enumerate}
+			\item Our function doesn't test for type --- it needs to do that!
+			\item Our test (floats) didn't account for the fact that floating-point arithmetic is a bit dodgy. We should have used \code{self.assertAlmostEqual}
+		\end{enumerate}
+	\end{frame}
+
+	\begin{frame}[fragile, allowframebreaks]{Example --- Fixing Issues!}
+		Let's fix these issues!
+
+		\framebreak
+
+		\lstinputlisting[style=python, title=add.py]{./code/simple/v2-add.py}
+
+		\lstinputlisting[style=python, title=test\_some\_functions.py]{./code/simple/v2-test_some_functions.py}
+
+		\framebreak
+
+		\lstinputlisting[style=output, title=Output]{./code/simple/v2-output.txt}
+	\end{frame}
+
+	\begin{frame}{Your Turn}
+		Take a few minutes and write your own test for the related \code{subtract.py}. Think about what sorts of behaviours you want, and try to avoid looking at the examples as much as possible.
+	\end{frame}
+
+	\section{Testing \code{Django}}
+	
+	\begin{frame}{Introduction}
+		\begin{itemize}
+			\item \code{unittest} module is at the heart of testing Django
+			\item For code that tests the actual database, Django provides a subclass of \code{unittest.TestCase} which you subclass for your tests
+			\item \code{from django.test import TestCase}
+			\item Will automatically start a clean DB instance at the beginning of \emph{each} test and clean up when done
+			\item You can freely mix `regular' tests and Django ones in the same test suite
+			\item To run these tests, need to use the `test' command:
+
+				\code{python manage.py test the\_file\_you\_are\_testing.py}
+
+			\item You can also omit the filename to test all files it can find or specify a specific app
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile]{\code{setUp} and \code{tearDown}}
+		\begin{itemize}
+			\item You will often want to have actions performed before and after each test in a suite (e.g. populate / clean the db)
+			\item Define a \code{setUp} method: this will be run before each test in the suite
+			\item Define a \code{tearDown} method: this will be run after each test in the suite
+			\item (These are actually part of the base \code{unittest.TestCase}, so you can also use them in your regular tests)
+			\item NB cleanup should be handled in \code{setUp} in case of a failing test
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile]{Example}
+			\begin{lstlisting}[style=python, autogobble]
+				from Django.test import TestCase
+				from app.models import * #need access to your models
+
+				class TestMyModel(TestCase):
+					def setUp(self):
+						populate the db here with fixtures
+					def test_model_works(self):
+						make assertions about models here (e.g. test for existence, changes, &c.)
+			\end{lstlisting}
+	\end{frame}
+
+	\begin{frame}[fragile, shrink]{The App}
+		The application we're going to test is a simple listing of books.
+
+		\lstinputlisting[style=python, title=models.py]{./code/django/models.py}
+	\end{frame}
+
+	\begin{frame}[fragile, allowframebreaks]{Example --- Testing \code{add\_book\_to\_existing\_author}}
+		\lstinputlisting[style=python, firstline=1, lastline=8]{./code/django/utility.py}
+
+		\framebreak
+
+		\lstinputlisting[style=python, title=tests.py]{./code/django/v1-tests.py}
+
+		\framebreak
+
+		\lstinputlisting[style=python, title=tests.py]{./code/django/v1-output.txt}
+
+	\end{frame}
+
+	\begin{frame}[fragile, allowframebreaks]{Example --- Testing the Other One!}
+		\code{utility.py} contains another function to add a new book and a new author at the same time. Take a few moments and write some tests for it! Knowing that the signature is \code{add\_book\_with\_author(title, first\_name, last\_name)}, try to write the tests \emph{without} looking at \code{utility.py}
+
+		\framebreak
+
+		\lstinputlisting[style=python, title=tests.py]{./code/django/v2-tests.py}
+	\end{frame}
+
+
+	\section{Testing \code{Graphene}}
+
+	\begin{frame}{Testing Graphene}
+		\begin{itemize}
+			\item Graphene subclass \code{GraphQLTestCase}
+			\item \code{from graphene\_django.utils.testing import GraphQLTestCase}
+			\item Allows you to make queries against the schema
+			\item In the test:
+
+				\code{self.query('graphql query / mutation', variables=variables)}
+			\item Returns a response including the status \code{response.status} and a JSON of the content (\code{response.content})
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}{Differences}
+		\begin{itemize}
+			\item Will need to import your schema
+			\item Often useful to set up things common to an entire test suite using \code{setUpClass(cls)} --- a class method
+			\item Run once before ALL tests in the suite
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile, allowframebreaks]{Example --- Sample Test}
+		\begin{lstlisting}[style = python, autogobble]
+			from graphene_django.utils.testing import GraphQLTestCase
+			import json
+
+			from somewhere import the models you need
+			from somewhere.schema import schema
+
+			class TestSomeQueryOrWhatever(GraphQLTestCase):
+				GRAPHQL_SCHEMA = schema
+
+				@classmethod
+				def setUpClass(cls):
+					super(TestSomeQueryOrWhatever, cls).setUpClass()
+					cls.query_string = """
+					query {
+						stuff {
+							etc
+						}
+					}
+					"""
+					now I generate the fixtures
+
+				def test_the_query(self):
+					query_variables = {'yes': False}
+					response = self.query(self.query_string, variables=query_variables)
+					decoded = json.loads(response.content)
+
+					assertions go here
+		\end{lstlisting}
+	\end{frame}
+
+	\begin{frame}{The Setup}
+		Here is an explanation of the Graphene side of things:
+		\begin{itemize}
+			\item Two queries:
 				\begin{enumerate}
-					\item Unit Tests: Test one unit (e.g. a single function)
-					\item Integration Tests: Tests how several different units integrate with each other (e.g.  single portion of the application)
-					\item End-to-End Test: Test the entirety of an application from one end to another
+					\item \code{allBooks}
+					\item \code{allAuthors}
 				\end{enumerate}
-			\item Basic approach: AAA
-				\begin{itemize}
-					\item \textbf{A}rrange: Set up the initial conditions of the test
-					\item \textbf{A}ct: Do / change something
-					\item \textbf{A}ssert: use assertions to guarantee that the correct thing happened (or not)
-				\end{itemize}
-			\item Test Runner:  a program that takes care of running our tests for us (e.g. when to run or re-run tests, how to display the results, how to find the tests, \&c.)
+			\item Two mutations, roughly corresponding to the two functions we already looked at
+				\begin{enumerate}
+					\item \code{createBookWithExistingAuthor}
+					\item \code{createBookWithNewAuthor}
+				\end{enumerate}
 		\end{itemize}
+		NB The two functions that we created need to be slighly modified to return the things they create
 	\end{frame}
 
-	\begin{frame}{Testing Solutions}
-		\begin{itemize}
-			\item Unit and Small Integration Tests: Jest (\url{https://jestjs.io/})
-			\item Larger Integration and End-to-End: Cypress (\url{https://www.cypress.io/})
-			\item $+$ some other smaller libraries to enhance each of them
-		\end{itemize}
+	\begin{frame}[fragile, allowframebreaks]{Graphene Files}
+		\lstinputlisting[style=python, title=schema.py]{./code/graphene/schema.py}
+		\lstinputlisting[style=python, title=utility.py]{./code/graphene/utility.py}
 	\end{frame}
 
-	\section{Jest --- Unit Tests}
-	\begin{frame}[fragile]{Jest}
-		\begin{itemize}
-			\item Jest: test runner, also provides some tests
-			\item \texttt{describe}, \texttt{it/test}, \texttt{expect}
-			\item Basic form:
-				\begin{lstlisting}[autogobble]
-					describe("The thing I'm testing", () => {
-						test('should do a thing', () => {
-							expect(something).toBe(the correct value)
-						})
-					})
-				\end{lstlisting}
-		\end{itemize}
-	\end{frame}
-
-	\begin{frame}[fragile]{Running Jest}
-		\begin{itemize}
-			\item Will automatically pick up \texttt{*.test.js} or \texttt{*.spec.js} files
-			\item \texttt{npm run test} --- all of them
-			\item \texttt{npm run test PATH\_TO\_FILE} --- will only run that one
-			\item Watches files for changes and re-runs tests as appropriate
-			\item By default, it will only re-run the failing ones
-			\item Important assertions (all of these also take \texttt{.not.????} to negate them):
-				\begin{itemize}
-					\item \texttt{toBe}: test equality
-					\item \texttt{toBeUndefined}: is it \texttt{===undefined}
-					\item \texttt{toMatchSnapshot}: does it match the stored snapshot? (You can pass in basically anything; the first time a snapshot is generated)
-					\item \texttt{toThrow}: does it throw the correct error? (needs additional function wrapper)
-				\end{itemize}
-			\item (Full list: \url{https://jestjs.io/docs/en/expect})
-		\end{itemize}
-	\end{frame}
-
-	\begin{frame}{Example Program}
-		Our test program is a simple React application that uses inputs to ask the user for two numbers and an operation, and displays the result. 
-	\end{frame}
-	\begin{frame}[fragile, allowframebreaks]{Example --- Testing a Single Function with Jest}
-		Let's test the functions in the \texttt{functions.js} file.
-
-		(You can checkout the \texttt{initial-function-test} of the \texttt{frontend-testing-tutorial})
+	\begin{frame}[fragile, allowframebreaks]{Example --- Testing Queries}
+		Let's test the \code{allBooks} query!	
 
 		\framebreak
 
-		\lstinputlisting[title=function.js]{./code/unit-jest/functions.js}
-		\lstinputlisting[title=function.test.js]{./code/unit-jest/functions.test.js}
-
-
+		\lstinputlisting[style=python, title=test\_queries\_and\_mutations.py]{./code/graphene/v1-test_queries_and_mutations.py}
 	\end{frame}
 
-	\begin{frame}[fragile]{Testing DOM Elements with \texttt{react-testing-library}}
+	\begin{frame}{Your Turn!}
+		On your own, try to test the \code{allAuthors} query!
+	\end{frame}
+
+	\begin{frame}[fragile, allowframebreaks]{Example --- Testing Mutations}
+		Luckily, testing mutations is essentially the same as queries --- the main difference is that you also want to test that the changes to the database have taken as well! This means that we need to test the congruence between:
 		\begin{itemize}
-			\item Use \texttt{react-testing-library} (\url{https://testing-library.com/docs/react-testing-library/intro/})
-			\item Philosophy: tests should resemble the way users interact with the site
-			\item Uses the node virtual DOM to run applications
-			\item Adds several commands to make assertions about the DOM 
-			\item \texttt{npm install --save-dev @testing-library/react}
-			\item At the top of your testing file:
-				\begin{lstlisting}[autogobble]
-					import { render, screen } from @testing-library/react 
-					import @testing-library/jest-dom/extend-expect
-				\end{lstlisting}
+			\item The information we sent
+			\item The information we received
+			\item The information in the database
 		\end{itemize}
-	\end{frame}
 
-	\begin{frame}[fragile]{Getting and Asserting on DOM Elements}
-		\begin{itemize}
-			\item \texttt{get} / \texttt{find} / \texttt{query} \texttt{[All]}
-			\item \texttt{by}
-				\begin{itemize}
-					\item \texttt{Text}
-					\item \texttt{LabelText}
-					\item \texttt{Role}
-					\item \texttt{TestId}
-				\end{itemize}
-			\item Adds some assertions:
-				\begin{itemize}
-					\item \texttt{.toBeInTheDocument()}
-					\item \texttt{.toBeDisabled()}
-					\item \texttt{.toHaveAttribute()}
-				\end{itemize}
+		We also want to test that it fails in the way that we expect!
 
-				\begin{lstlisting}[autogobble]
-					expect(screen.getByText(/flibbertigibbet/i)).toBeInTheDocument();
-				\end{lstlisting}
-		\end{itemize}
-	\end{frame}
-
-	\begin{frame}[fragile]{Firing Events}
-		\begin{itemize}
-			\item Use \texttt{@testing-library/user-event} for events
-			\item (\texttt{react-testing-library} has its own way to fire events (\texttt{fireEvent}), but this library is `more realistic')
-			\item (Some shortcomings, but generally what you want to use)
-			\item \texttt{npm install --save-dev @testing-library/user-event}
-			\item In your file: \texttt{import userEvent} from '@testing-library/user-event'
-			\item Fairly intuitive interface:
-				\begin{lstlisting}[autogobble]
-					userEvent.click(the thing to click)
-					userEvent.type(element, 'here{enter}is some{shift}text')
-				\end{lstlisting}
-		\end{itemize}
-	\end{frame}
-
-	\begin{frame}[fragile, allowframebreaks]{Example --- Testing the DOM and Events}
-		Let's tests the DOM and some simple events!
-
-		\begin{enumerate}
-			\item Can we enter values into the inputs and see the result?
-			\item When we change the values, do we see a corresponsing change in the output?
-		\end{enumerate}
+		Let's test the \code{createBookWithExistingAuthor} mutation.
 
 		\framebreak
 
-		\lstinputlisting[title=App.js]{./code/dom-jest/App.js}
-		\lstinputlisting[title=App.test.js]{./code/dom-jest/App.test.js}
+\lstinputlisting[style=python, title=test_queries_and_mutations.py]{./code/graphene/v2-test_queries_and_mutations.py}	
 	\end{frame}
 
-
-
-	\section{Cypress --- Integration and End-to-End Testing}
-	\begin{frame}[fragile]{Cypress}
+	\begin{frame}{Important}
 		\begin{itemize}
-			\item Full-featured test runner (basically does everything) (\href{https://www.cypress.io/}{Homepage})
-			\item Browser-based tests based on Mocha, Chai, \&c. (\href{https://docs.cypress.io/guides/references/bundled-tools.html#Other-Library-Utilities}{Full list})
-			\item \texttt{npm install cypress} (large download)
-			\item Your server needs to be running for the tests to run
-			\item Tests (\texttt{*.spec.js}) placed in the \texttt{cypress/integration} directory (from project root)
-			\item Config: \texttt{cypress.json}
-			\item Environment variables: \texttt{cypress.env.json}. They can also be stored in \texttt{cypress.json}\dots
-		\end{itemize}
-	\end{frame}
-
-	\begin{frame}[fragile]{cypress-testing-library}
-		\begin{itemize}
-			\item The default Cypress tests often rely on things like attributes or other things that the user can't directly use
-			\item \href{https://github.com/testing-library/cypress-testing-library}{\texttt{@testing-library/cypress}} allows us to use the same DOM queries in Cypress
-			\item Getting it to work requires a few more steps, but nothing too onerous (already installed for our project)
-		\end{itemize}
-	\end{frame}
-
-	\begin{frame}[fragile]{Cypress --- Querying, Asserting, and Actions}
-		\begin{itemize}
-			\item Chain off the base \texttt{cy} object
-			\item Can use the \texttt{@testing-library} queries
-			\item Cypress-native:
+			\item Test for the status \emph{and} the presence of an \code{error} attribute!
 				\begin{itemize}
-					\item \texttt{cy.visit(url)} --- probably the first one
-					\item \texttt{cy.contains(TEXT)} --- get the element with contents TEXT
-					\item \texttt{cy.get(QUERY SELECTOR, options)} --- use CSS selectors
-					\item \texttt{.should('eq', 6)} --- the assertions are based on Mocha and Chai --- ('exist') is also useful
-					\item \texttt{.click()}
-					\item \texttt{.type(WORDS)}
+					\item Status 200: query is syntactically good!
+					\item Status 400: query is syntactically invalid!
+					\item \code{error} attribute: error once the query has been delivered (i.e. in the resolver)
+					\item Careful: a bad response will still have a \code{data} attribute, but now this will contain data about the error
 				\end{itemize}
+			\item When testing failure modes, be very careful that it is failing for the reason you think! Generally, start with a valid query and go from there
+			\item For queries, test database $\iff$ \code{received}
+			\item For mutations, test database $\iff$ sent $\iff$ received
 		\end{itemize}
 	\end{frame}
 
-	\begin{frame}[fragile, allowframebreaks]{Example --- Cypress Testing}
-		let's recreate our earlier Jest test of our system using Cypress!
-
-		\begin{enumerate}
-			\item Can we enter values into the inputs and see the result?
-			\item When we change the values, do we see a corresponsing change in the output?
-		\end{enumerate}
-
-		\framebreak
-
-		\lstinputlisting[title=App.js]{./code/cypress-test/App.js}
-		\lstinputlisting[title=example.spec.js]{./code/cypress-test/example.spec.js}
+	\begin{frame}{Your Turn!}
+		On your own, try testing the \code{createBookWithNewAuthor} mutation!
 	\end{frame}
 
 	\begin{frame}{THE END}
