@@ -1,0 +1,223 @@
+\documentclass[t]{beamer}
+
+\usetheme{metropolis}
+
+\usepackage{url}
+\usepackage{hyperref}
+\hypersetup{
+	colorlinks=true,
+}
+\usepackage{lstautogobble}
+\usepackage{listings}
+\lstset{numbers=left, frame=l, tabsize=3, basicstyle=\footnotesize, breaklines=true, frame=single}
+
+\title{Frontend Testing with Jest and Cypress}
+\author{Eric Campbell}
+\date{}
+
+\begin{document}
+	\begin{frame}
+		\maketitle
+	\end{frame}
+
+	\section{Testing Fundamentals}
+	\begin{frame}{Testing Fundamentals}
+		\begin{itemize}
+			\item ``3'' Types
+				\begin{enumerate}
+					\item Unit Tests: Test one unit (e.g. a single function)
+					\item Integration Tests: Tests how several different units integrate with each other (e.g.  single portion of the application)
+					\item End-to-End Test: Test the entirety of an application from one end to another
+				\end{enumerate}
+			\item Basic approach: AAA
+				\begin{itemize}
+					\item \textbf{A}rrange: Set up the initial conditions of the test
+					\item \textbf{A}ct: Do / change something
+					\item \textbf{A}ssert: use assertions to guarantee that the correct thing happened (or not)
+				\end{itemize}
+			\item Test Runner:  a program that takes care of running our tests for us (e.g. when to run or re-run tests, how to display the results, how to find the tests, \&c.)
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}{Testing Solutions}
+		\begin{itemize}
+			\item Unit and Small Integration Tests: Jest (\url{https://jestjs.io/})
+			\item Larger Integration and End-to-End: Cypress (\url{https://www.cypress.io/})
+			\item $+$ some other smaller libraries to enhance each of them
+		\end{itemize}
+	\end{frame}
+
+	\section{Jest --- Unit Tests}
+	\begin{frame}[fragile]{Jest}
+		\begin{itemize}
+			\item Jest: test runner, also provides some tests
+			\item \texttt{describe}, \texttt{it/test}, \texttt{expect}
+			\item Basic form:
+				\begin{lstlisting}[autogobble]
+					describe("The thing I'm testing", () => {
+						test('should do a thing', () => {
+							expect(something).toBe(the correct value)
+						})
+					})
+				\end{lstlisting}
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile]{Running Jest}
+		\begin{itemize}
+			\item Will automatically pick up \texttt{*.test.js} or \texttt{*.spec.js} files
+			\item \texttt{npm run test} --- all of them
+			\item \texttt{npm run test PATH\_TO\_FILE} --- will only run that one
+			\item Watches files for changes and re-runs tests as appropriate
+			\item By default, it will only re-run the failing ones
+			\item Important assertions (all of these also take \texttt{.not.????} to negate them):
+				\begin{itemize}
+					\item \texttt{toBe}: test equality
+					\item \texttt{toBeUndefined}: is it \texttt{===undefined}
+					\item \texttt{toMatchSnapshot}: does it match the stored snapshot? (You can pass in basically anything; the first time a snapshot is generated)
+					\item \texttt{toThrow}: does it throw the correct error? (needs additional function wrapper)
+				\end{itemize}
+			\item (Full list: \url{https://jestjs.io/docs/en/expect})
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}{Example Program}
+		Our test program is a simple React application that uses inputs to ask the user for two numbers and an operation, and displays the result. 
+	\end{frame}
+	\begin{frame}[fragile, allowframebreaks]{Example --- Testing a Single Function with Jest}
+		Let's test the functions in the \texttt{functions.js} file.
+
+		(You can checkout the \texttt{initial-function-test} of the \texttt{frontend-testing-tutorial})
+
+		\framebreak
+
+		\lstinputlisting[title=function.js]{./code/unit-jest/functions.js}
+		\lstinputlisting[title=function.test.js]{./code/unit-jest/functions.test.js}
+
+
+	\end{frame}
+
+	\begin{frame}[fragile]{Testing DOM Elements with \texttt{react-testing-library}}
+		\begin{itemize}
+			\item Use \texttt{react-testing-library} (\url{https://testing-library.com/docs/react-testing-library/intro/})
+			\item Philosophy: tests should resemble the way users interact with the site
+			\item Uses the node virtual DOM to run applications
+			\item Adds several commands to make assertions about the DOM 
+			\item \texttt{npm install --save-dev @testing-library/react}
+			\item At the top of your testing file:
+				\begin{lstlisting}[autogobble]
+					import { render, screen } from @testing-library/react 
+					import @testing-library/jest-dom/extend-expect
+				\end{lstlisting}
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile]{Getting and Asserting on DOM Elements}
+		\begin{itemize}
+			\item \texttt{get} / \texttt{find} / \texttt{query} \texttt{[All]}
+			\item \texttt{by}
+				\begin{itemize}
+					\item \texttt{Text}
+					\item \texttt{LabelText}
+					\item \texttt{Role}
+					\item \texttt{TestId}
+				\end{itemize}
+			\item Adds some assertions:
+				\begin{itemize}
+					\item \texttt{.toBeInTheDocument()}
+					\item \texttt{.toBeDisabled()}
+					\item \texttt{.toHaveAttribute()}
+				\end{itemize}
+
+				\begin{lstlisting}[autogobble]
+					expect(screen.getByText(/flibbertigibbet/i)).toBeInTheDocument();
+				\end{lstlisting}
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile]{Firing Events}
+		\begin{itemize}
+			\item Use \texttt{@testing-library/user-event} for events
+			\item (\texttt{react-testing-library} has its own way to fire events (\texttt{fireEvent}), but this library is `more realistic')
+			\item (Some shortcomings, but generally what you want to use)
+			\item \texttt{npm install --save-dev @testing-library/user-event}
+			\item In your file: \texttt{import userEvent} from '@testing-library/user-event'
+			\item Fairly intuitive interface:
+				\begin{lstlisting}[autogobble]
+					userEvent.click(the thing to click)
+					userEvent.type(element, 'here{enter}is some{shift}text')
+				\end{lstlisting}
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile, allowframebreaks]{Example --- Testing the DOM and Events}
+		Let's tests the DOM and some simple events!
+
+		\begin{enumerate}
+			\item Can we enter values into the inputs and see the result?
+			\item When we change the values, do we see a corresponsing change in the output?
+		\end{enumerate}
+
+		\framebreak
+
+		\lstinputlisting[title=App.js]{./code/dom-jest/App.js}
+		\lstinputlisting[title=App.test.js]{./code/dom-jest/App.test.js}
+	\end{frame}
+
+
+
+	\section{Cypress --- Integration and End-to-End Testing}
+	\begin{frame}[fragile]{Cypress}
+		\begin{itemize}
+			\item Full-featured test runner (basically does everything) (\href{https://www.cypress.io/}{Homepage})
+			\item Browser-based tests based on Mocha, Chai, \&c. (\href{https://docs.cypress.io/guides/references/bundled-tools.html#Other-Library-Utilities}{Full list})
+			\item \texttt{npm install cypress} (large download)
+			\item Your server needs to be running for the tests to run
+			\item Tests (\texttt{*.spec.js}) placed in the \texttt{cypress/integration} directory (from project root)
+			\item Config: \texttt{cypress.json}
+			\item Environment variables: \texttt{cypress.env.json}. They can also be stored in \texttt{cypress.json}\dots
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile]{cypress-testing-library}
+		\begin{itemize}
+			\item The default Cypress tests often rely on things like attributes or other things that the user can't directly use
+			\item \href{https://github.com/testing-library/cypress-testing-library}{\texttt{@testing-library/cypress}} allows us to use the same DOM queries in Cypress
+			\item Getting it to work requires a few more steps, but nothing too onerous (already installed for our project)
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile]{Cypress --- Querying, Asserting, and Actions}
+		\begin{itemize}
+			\item Chain off the base \texttt{cy} object
+			\item Can use the \texttt{@testing-library} queries
+			\item Cypress-native:
+				\begin{itemize}
+					\item \texttt{cy.visit(url)} --- probably the first one
+					\item \texttt{cy.contains(TEXT)} --- get the element with contents TEXT
+					\item \texttt{cy.get(QUERY SELECTOR, options)} --- use CSS selectors
+					\item \texttt{.should('eq', 6)} --- the assertions are based on Mocha and Chai --- ('exist') is also useful
+					\item \texttt{.click()}
+					\item \texttt{.type(WORDS)}
+				\end{itemize}
+		\end{itemize}
+	\end{frame}
+
+	\begin{frame}[fragile, allowframebreaks]{Example --- Cypress Testing}
+		let's recreate our earlier Jest test of our system using Cypress!
+
+		\begin{enumerate}
+			\item Can we enter values into the inputs and see the result?
+			\item When we change the values, do we see a corresponsing change in the output?
+		\end{enumerate}
+
+		\framebreak
+
+		\lstinputlisting[title=App.js]{./code/cypress-test/App.js}
+		\lstinputlisting[title=example.spec.js]{./code/cypress-test/example.spec.js}
+	\end{frame}
+
+	\begin{frame}{THE END}
+	!	
+	\end{frame}
+\end{document}
